@@ -1,0 +1,44 @@
+diff --git a/src/detail/common.hpp b/src/detail/common.hpp
+index dffd218..e31887a 100644
+--- a/src/detail/common.hpp
++++ b/src/detail/common.hpp
+@@ -58,6 +58,11 @@
+ #include <boost/core/noncopyable.hpp>
+ #include <boost/lexical_cast.hpp>
+ 
++#include <boost/log/core.hpp>
++#include <boost/log/trivial.hpp>
++#include <boost/log/utility/setup/common_attributes.hpp>
++#include <boost/log/utility/setup/file.hpp>
++
+ namespace chronosync {
+ 
+ using boost::noncopyable;
+diff --git a/src/logic.cpp b/src/logic.cpp
+index db6bc02..870b26e 100644
+--- a/src/logic.cpp
++++ b/src/logic.cpp
+@@ -637,6 +637,7 @@ Logic::sendSyncInterest()
+                                                  bind(&Logic::onSyncNack, this, _1, _2),
+                                                  bind(&Logic::onSyncTimeout, this, _1));
+ 
++  BOOST_LOG_TRIVIAL(info) << "SEND_SYNC_INT::" << interest.getName();
+   CHRONO_LOG_DBG("Send interest: " << interest.getName());
+   CHRONO_LOG_DBG("<< Logic::sendSyncInterest");
+ }
+diff --git a/src/logic.hpp b/src/logic.hpp
+index 25514ed..65d76a1 100644
+--- a/src/logic.hpp
++++ b/src/logic.hpp
+@@ -33,6 +33,11 @@
+ 
+ #include <unordered_map>
+ 
++#include <boost/log/core.hpp>
++#include <boost/log/trivial.hpp>
++#include <boost/log/utility/setup/common_attributes.hpp>
++#include <boost/log/utility/setup/file.hpp>
++
+ namespace chronosync {
+ 
+ /**

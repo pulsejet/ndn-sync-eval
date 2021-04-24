@@ -45,13 +45,17 @@ PUB_TIMING = 0
 
 PUB_TIMING_VALS = [1000, 5000, 10000, 15000]
 RUN_NUMBER_VALS = list(range(1, 4))
-LOG_PREFIX = "GEANT_L10"
+LOG_PREFIX = "GEANT"
 #topoFile = "topologies/default-topology.conf"
-topoFile = "topologies/geant_l10.conf"
+topoFile = "topologies/geant.conf"
+
+#SYNC_EXEC = "/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval"
+SYNC_EXEC = "/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval"
+LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/chronosync/"
 
 def getLogPath():
     LOG_NAME = "{}-{}-{}".format(LOG_PREFIX, PUB_TIMING, RUN_NUMBER)
-    logpath = "/home/vagrant/mini-ndn/work/log/svs/" + LOG_NAME
+    logpath = LOG_MAIN_DIRECTORY + LOG_NAME
 
     if not os.path.exists(logpath):
         os.makedirs(logpath)
@@ -67,7 +71,7 @@ class SvsChatApplication(Application):
         return "/ndn/{0}-site/{0}/svs_chat/{0}".format(self.node.name)
 
     def start(self):
-        exe = "/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval"
+        exe = SYNC_EXEC
         identity = self.get_svs_identity()
 
         run_cmd = "{} {} {}/{}.log {} >/dev/null 2>&1 &".format(exe, identity, getLogPath(), self.node.name, PUB_TIMING)
@@ -106,15 +110,15 @@ if __name__ == '__main__':
 
     info('Setting NFD strategy to multicast on all nodes with prefix')
     for node in ndn.net.hosts:
-        # Nfdc.setStrategy(node, ndn.args.svsPrefix, Nfdc.STRATEGY_MULTICAST)
         Nfdc.setStrategy(node, "/ndn/svs", Nfdc.STRATEGY_MULTICAST)
+        Nfdc.setStrategy(node, "/ndn/chronosync", Nfdc.STRATEGY_MULTICAST)
 
     info('Adding static routes to NFD\n')
     start = int(time.time() * 1000)
 
     grh = NdnRoutingHelper(ndn.net, 'udp', 'link-state')
     for host in ndn.net.hosts:
-        grh.addOrigin([ndn.net[host.name]], ["/ndn/svs/"])
+        grh.addOrigin([ndn.net[host.name]], ["/ndn/svs/", "/ndn/chronosync/"])
 
     grh.calculateNPossibleRoutes()
 
