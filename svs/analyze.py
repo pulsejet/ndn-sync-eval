@@ -11,56 +11,43 @@ from collections import OrderedDict
 from operator import itemgetter
 from collections import defaultdict
 
-RUN_NUMBER_VALS = list(range(1, 11))
-NUM_NODES_VALS = [5,10,15,20,25,30,35,40]
+OUTER_LOG_DIR = "/home/vagrant/mini-ndn/work/log/svs"
 
-LOG_PREFIX = "GEANT_L10"
-ROUTES_JSON = "GEANT-routes.json"
+NUM_NODES = 20
+PUB_TIMING_VALS = [10000, 15000]
+RUN_NUMBER_VALS = list(range(1, 4))
+
+LOG_PREFIX = "GEANT_L0"
 
 EPOCH = datetime.now().timestamp()
 
-headp = False
+TIMING_DATA = [[] for x in PUB_TIMING_VALS]
+SYNC_INT_DATA = [[] for x in PUB_TIMING_VALS]
+SUCCESS_DATA = [[] for x in PUB_TIMING_VALS]
+NUM_PUBLISHED_DATA = [[] for x in PUB_TIMING_VALS]
 
-ckeys = ['num_nodes', 'run_number', 'node', 'succ', 'pm_succ', 'avg',
-         'median', 'max', 'avg_nlt', 'median_nlt', 'max_nlt', 'sync_ints']
-dict_writer = csv.DictWriter(sys.stdout, ckeys)
-dict_writer.writeheader()
+NUM_nInInterests = [[] for x in PUB_TIMING_VALS]
+NUM_nOutData = [[] for x in PUB_TIMING_VALS]
 
-FULL_CSV = "{}.csv".format(LOG_PREFIX)
-with open(FULL_CSV, 'w') as f:
-    fdict_writer = csv.DictWriter(f, ckeys)
-    fdict_writer.writeheader()
+for i_t, PUB_TIMING in enumerate(PUB_TIMING_VALS):
+    for RUN_NUMBER in RUN_NUMBER_VALS:
+        PUBLISHING_NODES = []
 
-ROUTES = {}
-with open(ROUTES_JSON, 'r') as f:
-    ROUTES = json.loads(f.read())
-
-for num_nodes in NUM_NODES_VALS:
-    NODES_AVG = []
-
-    NODE_CSV = "{}-{}.csv".format(LOG_PREFIX, num_nodes)
-    with open(NODE_CSV, 'w') as f:
-        fdict_writer = csv.DictWriter(f, ckeys)
-        fdict_writer.writeheader()
-
-    for run_number in RUN_NUMBER_VALS:
-        RUN_NUMBER = run_number
-        NUM_NODES = num_nodes
-
-        LOG_NAME = "{}-{}-{}".format(LOG_PREFIX, NUM_NODES, RUN_NUMBER)
-        LOG_DIR = "/home/vagrant/mini-ndn/work/log/svs/" + LOG_NAME
-
-        logfiles = glob.glob(LOG_DIR + "/*.log")
+        # Let log directory and files
+        LOG_NAME = "{}-{}-{}".format(LOG_PREFIX, PUB_TIMING, RUN_NUMBER)
+        LOG_DIR = OUTER_LOG_DIR + '/' + LOG_NAME
 
         PUBLISHES = {}
         SYNCS = {}
         RECIEVES = {}
-        SYNC_INTS = defaultdict(int)
+        SYNC_INTS = 0
 
-        for logfile in logfiles:
+        for logfile in glob.glob(LOG_DIR + "/*.log"):
             nodename = logfile.split('/')[-1].split('.')[0]
             df = pd.read_csv(logfile, header=None, names=['t', 'pid', 'tid', 'm'], skipinitialspace = True)
             df = df.replace(' "', '', regex=True).replace('"', '', regex=True)
+
+            print("Read", logfile)
 
             for index, row in df.iterrows():
                 t = datetime.strptime(row['t'], "%Y-%m-%d %H:%M:%S.%f")
@@ -75,9 +62,7 @@ for num_nodes in NUM_NODES_VALS:
                     RECIEVES[m[2]]['nodes'].append(m[1])
                     RECIEVES[m[2]]['times'].append(ti)
                 if 'SEND_SYNC_INT' in m[0]:
-                    SYNC_INTS[nodename] += 1
-
-        TIMINGS = {}
+                    SYNC_INTS += 1
 
         for msg in RECIEVES:
             if msg not in PUBLISHES:
@@ -89,102 +74,50 @@ for num_nodes in NUM_NODES_VALS:
 
             deltas = [x - pubtime for x in recv_times]
             publisher = msg.split('/')[3]
+            if publisher not in PUBLISHING_NODES:
+                PUBLISHING_NODES.append(publisher)
 
-            if publisher not in TIMINGS:
-                TIMINGS[publisher] = []
-            TIMINGS[publisher].extend(deltas)
+            TIMING_DATA[i_t].extend(deltas)
 
-        # Get RTTs
-        AVG_LATENCY = {}
-        MAX_LATENCY = {}
-        for node in TIMINGS:
-            latencies = []
-            for node2 in TIMINGS:
-                if node2 == node:
-                    continue
+        SYNC_INT_DATA[i_t].append(SYNC_INTS / len(PUBLISHES))
+        SUCCESS_DATA[i_t].append((len([x for k in RECIEVES for x in RECIEVES[k]['times']]) / (NUM_NODES - 1)) / len(PUBLISHES))
+        NUM_PUBLISHED_DATA[i_t].append(len(PUBLISHES))
 
-                latencies.append(ROUTES[node][node2])
+        nInInterests = 0
+        nOutData = 0
+        for startfile in glob.glob(LOG_DIR + "/report-start-*.status"):
+            nodename = startfile.split('/')[-1].split('.')[0].split('-')[-1]
+            endfile = startfile.replace('report-start', 'report-end')
 
-            AVG_LATENCY[node] = sum(latencies) / len(latencies)
-            MAX_LATENCY[node] = max(latencies)
+            def read_status_file(filename):
+                status = {}
+                with open(filename, "r") as sf:
+                    for line in sf.readlines():
+                        if "Channels" in line:
+                            break
 
-        DELTAS = []
-        for node in TIMINGS:
-            deltas = TIMINGS[node]
-            med_d = statistics.median(deltas)
-            avg_d = sum(deltas) / len(deltas)
-            max_d = max(deltas)
-            DELTAS.append({
-                'num_nodes': num_nodes,
-                'run_number': run_number,
-                'node': node,
-                'succ': len(deltas),
-                'pm_succ': round(len(deltas) / (24 * (NUM_NODES - 1)), 3),
-                'avg': round(avg_d),
-                'median': round(med_d),
-                'max': round(max_d),
-                'avg_nlt': round(avg_d / AVG_LATENCY[node], 3),
-                'median_nlt': round(med_d / AVG_LATENCY[node], 3),
-                'max_nlt': round(avg_d / MAX_LATENCY[node], 3),
-                'sync_ints': SYNC_INTS[node],
-            })
+                        if "=" in line:
+                            line = line.strip()
+                            v = line.split('=')
+                            try:
+                                status[v[0]] = int(v[1])
+                            except ValueError:
+                                status[v[0]] = v[1]
+                return status
 
-        T_SUCC = [D['succ'] for D in DELTAS]
-        T_AVG = [D['avg'] for D in DELTAS]
-        T_MED = [D['median'] for D in DELTAS]
-        T_MAX = [D['max'] for D in DELTAS]
-        T_AVG_NLT = [D['avg_nlt'] for D in DELTAS]
-        T_MED_NLT = [D['median_nlt'] for D in DELTAS]
-        T_MAX_NLT = [D['max_nlt'] for D in DELTAS]
-        T_SYNC_INTS = [D['sync_ints'] for D in DELTAS]
-        NODES_AVG.append({
-            'num_nodes': num_nodes,
-            'run_number': run_number,
-            'node': 'AVG',
-            'succ': round(sum(T_SUCC) / len(T_SUCC), 1),
-            'pm_succ': round(sum(T_SUCC) / (24 * (NUM_NODES - 1) * NUM_NODES), 3),
-            'avg': round(sum(T_AVG) / len(T_AVG)),
-            'median': round(sum(T_MED) / len(T_MED)),
-            'max': round(sum(T_MAX) / len(T_MAX)),
-            'avg_nlt': round(sum(T_AVG_NLT) / len(T_AVG_NLT), 2),
-            'median_nlt': round(sum(T_MED_NLT) / len(T_MED_NLT), 2),
-            'max_nlt': round(sum(T_MAX_NLT) / len(T_MAX_NLT), 2),
-            'sync_ints': round(sum(T_SYNC_INTS) / len(T_SYNC_INTS)),
-        })
-        dict_writer.writerows(DELTAS)
+            start = read_status_file(startfile)
+            end = read_status_file(endfile)
 
-        with open(NODE_CSV, 'a') as f:
-            fdict_writer = csv.DictWriter(f, ckeys)
-            fdict_writer.writerows(DELTAS)
+            nInInterests += end['nInInterests'] - start['nInInterests']
+            nOutData += end['nOutData'] - start['nOutData']
 
-    # ============
-    T_SUCC = [D['succ'] for D in NODES_AVG]
-    T_AVG = [D['avg'] for D in NODES_AVG]
-    T_MED = [D['median'] for D in NODES_AVG]
-    T_MAX = [D['max'] for D in NODES_AVG]
-    T_AVG_NLT = [D['avg_nlt'] for D in NODES_AVG]
-    T_MAX_NLT = [D['max_nlt'] for D in NODES_AVG]
-    T_MED_NLT = [D['median_nlt'] for D in NODES_AVG]
-    T_SYNC_INTS = [D['sync_ints'] for D in NODES_AVG]
-    obj = {
-        'num_nodes': num_nodes,
-        'run_number': 'AVG',
-        'node': 'AVG',
-        'succ': round(sum(T_SUCC) / len(T_SUCC), 1),
-        'pm_succ': round(sum(T_SUCC) / (24 * (NUM_NODES - 1) * len(RUN_NUMBER_VALS)), 3),
-        'avg': round(sum(T_AVG) / len(T_AVG)),
-        'median': round(sum(T_MED) / len(T_MED)),
-        'max': round(sum(T_MAX) / len(T_MAX)),
-        'avg_nlt': round(sum(T_AVG_NLT) / len(T_AVG_NLT), 2),
-        'median_nlt': round(sum(T_MED_NLT) / len(T_MED_NLT), 2),
-        'max_nlt': round(sum(T_MAX_NLT) / len(T_MAX_NLT), 2),
-        'sync_ints': round(sum(T_SYNC_INTS) / len(T_SYNC_INTS)),
-    }
-    NODES_AVG.append(obj)
-    dict_writer.writerows(NODES_AVG)
+        NUM_nInInterests[i_t].append(nInInterests)
+        NUM_nOutData[i_t].append(nOutData)
 
-    with open(FULL_CSV, 'a') as f:
-        fdict_writer = csv.DictWriter(f, ckeys)
-        if RUN_NUMBER == 1:
-            fdict_writer.writeheader()
-        fdict_writer.writerows(NODES_AVG)
+print(len(TIMING_DATA))
+print(len(TIMING_DATA[0]))
+print(SYNC_INT_DATA)
+print(SUCCESS_DATA)
+print(NUM_PUBLISHED_DATA)
+print(NUM_nInInterests)
+print(NUM_nOutData)

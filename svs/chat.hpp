@@ -17,6 +17,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <stdlib.h>
 
 #include <ndn-svs/svsync-base.hpp>
 
@@ -54,7 +55,9 @@ public:
     std::string init_msg = "NODE_INIT=" + m_options.m_id;
     //publishMsg(init_msg);
 
-    for (int i = 1; i < 25; i++) {
+    long int start_time = static_cast<long int> (time(NULL));
+
+    for (int i = 1; i < 250; i++) {
         int sleepTimeInMilliseconds = m_sleepTime(m_rng);
         usleep(sleepTimeInMilliseconds * 1000);
 
@@ -63,9 +66,14 @@ public:
         std::string message = ss.str();
         publishMsg(message);
         BOOST_LOG_TRIVIAL(info) << "PUBL_MSG::" << m_options.m_id << "::" << message;
+
+        long int curr_time = static_cast<long int> (time(NULL));
+        if (curr_time - start_time > 120) {
+          break;
+        }
     }
 
-    sleep(10);
+    sleep(30);
 
     m_svs.reset();
     face.shutdown();
@@ -112,10 +120,13 @@ public:
 template <typename T>
 int
 callMain(int argc, char **argv) {
-  if (argc != 3) {
+  if (argc != 4) {
     BOOST_LOG_TRIVIAL(error) << "WRONG_ARGS";
     exit(1);
   }
+
+  averageTimeBetweenPublishesInMilliseconds = strtol(argv[3], NULL, 10);
+  varianceInTimeBetweenPublishesInMilliseconds = averageTimeBetweenPublishesInMilliseconds / 5;
 
   Options opt;
   opt.prefix = "/ndn/svs";
