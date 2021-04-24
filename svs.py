@@ -51,6 +51,8 @@ topoFile = "topologies/geant.conf"
 
 #SYNC_EXEC = "/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval"
 SYNC_EXEC = "/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval"
+
+#LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/svs/"
 LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/chronosync/"
 
 def getLogPath():
