@@ -127,7 +127,7 @@ callMain(int argc, char **argv) {
   varianceInTimeBetweenPublishesInMilliseconds = averageTimeBetweenPublishesInMilliseconds / 5;
 
   Options opt;
-  opt.prefix = "/ndn/chronosync";
+  opt.prefix = "/ndn/svs";
   opt.m_id = argv[1];
 
   initlogger(std::string(argv[2]));

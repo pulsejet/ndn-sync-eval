@@ -1,24 +1,182 @@
-diff --git a/src/detail/common.hpp b/src/detail/common.hpp
-index dffd218..e31887a 100644
---- a/src/detail/common.hpp
-+++ b/src/detail/common.hpp
-@@ -58,6 +58,11 @@
- #include <boost/core/noncopyable.hpp>
- #include <boost/lexical_cast.hpp>
- 
-+#include <boost/log/core.hpp>
-+#include <boost/log/trivial.hpp>
-+#include <boost/log/utility/setup/common_attributes.hpp>
-+#include <boost/log/utility/setup/file.hpp>
-+
- namespace chronosync {
- 
- using boost::noncopyable;
 diff --git a/src/logic.cpp b/src/logic.cpp
-index db6bc02..870b26e 100644
+index db6bc02..c3fe956 100644
 --- a/src/logic.cpp
 +++ b/src/logic.cpp
-@@ -637,6 +637,7 @@ Logic::sendSyncInterest()
+@@ -271,8 +271,10 @@ Logic::updateSeqNo(const SeqNo& seqNo, const Name& updatePrefix)
+     CHRONO_LOG_DBG("updateSeqNo: m_seqNo " << node.seqNo);
+ 
+     if (!m_isInReset) {
++      const std::lock_guard<std::mutex> lock(m_state_mutex);
+       CHRONO_LOG_DBG("updateSeqNo: not in Reset");
+       ConstBufferPtr previousRoot = m_state.getRootDigest();
++
+       {
+         std::string hash = ndn::toHex(previousRoot->data(), previousRoot->size(), false);
+         CHRONO_LOG_DBG("Hash: " << hash);
+@@ -290,7 +292,6 @@ Logic::updateSeqNo(const SeqNo& seqNo, const Name& updatePrefix)
+         commit->update(node.sessionName, node.seqNo);
+         commit->setRootDigest(m_state.getRootDigest());
+         insertToDiffLog(commit, previousRoot);
+-
+         satisfyPendingSyncInterests(prefix, commit);
+       }
+     }
+@@ -300,6 +301,7 @@ Logic::updateSeqNo(const SeqNo& seqNo, const Name& updatePrefix)
+ ConstBufferPtr
+ Logic::getRootDigest() const
+ {
++  const std::lock_guard<std::mutex> lock(m_state_mutex);
+   return m_state.getRootDigest();
+ }
+ 
+@@ -419,13 +421,20 @@ Logic::processSyncInterest(const Interest& interest, bool isTimedProcessing/*=fa
+   Name name = interest.getName();
+   ConstBufferPtr digest = make_shared<ndn::Buffer>(name.get(-1).value(), name.get(-1).value_size());
+ 
+-  ConstBufferPtr rootDigest = m_state.getRootDigest();
++  ConstBufferPtr rootDigest;
++  {
++    const std::lock_guard<std::mutex> lock(m_state_mutex);
++    rootDigest = m_state.getRootDigest();
++  }
+ 
+   // If the digest of the incoming interest is the same as root digest
+   // Put the interest into InterestTable
+   if (*rootDigest == *digest) {
+     CHRONO_LOG_DBG("Oh, we are in the same state");
+-    m_interestTable.insert(interest, digest, false);
++    {
++      const std::lock_guard<std::mutex> lock(m_interestTable_mutex);
++      m_interestTable.insert(Interest(interest.getName()), digest, false);
++    }
+ 
+     if (!m_isInReset)
+       return;
+@@ -451,22 +460,29 @@ Logic::processSyncInterest(const Interest& interest, bool isTimedProcessing/*=fa
+   // If the digest of incoming interest is an "empty" digest
+   if (*digest == *EMPTY_DIGEST) {
+     CHRONO_LOG_DBG("Poor guy, he knows nothing");
++    const std::lock_guard<std::mutex> lock(m_state_mutex);
+     sendSyncData(m_defaultUserPrefix, name, m_state);
+     return;
+   }
+ 
+-  auto stateIter = m_log.find(digest);
+-  // If the digest of incoming interest can be found from the log
+-  if (stateIter != m_log.end()) {
+-    CHRONO_LOG_DBG("It is ok, you are so close");
+-    sendSyncData(m_defaultUserPrefix, name, *(*stateIter)->diff());
+-    return;
++  {
++    const std::lock_guard<std::mutex> lock(m_log_mutex);
++    auto stateIter = m_log.find(digest);
++    // If the digest of incoming interest can be found from the log
++    if (stateIter != m_log.end()) {
++      CHRONO_LOG_DBG("It is ok, you are so close");
++      sendSyncData(m_defaultUserPrefix, name, *(*stateIter)->diff());
++      return;
++    }
+   }
+ 
+   if (!isTimedProcessing) {
+     CHRONO_LOG_DBG("Let's wait, just wait for a while");
+     // Do not hurry, some incoming SyncReplies may help us to recognize the digest
+-    m_interestTable.insert(interest, digest, true);
++    {
++      const std::lock_guard<std::mutex> lock(m_interestTable_mutex);
++      m_interestTable.insert(Interest(interest.getName()), digest, true);
++    }
+ 
+     m_delayedInterestProcessingId =
+       m_scheduler.schedule(time::milliseconds(m_rangeUniformRandom(m_rng)),
+@@ -475,7 +491,10 @@ Logic::processSyncInterest(const Interest& interest, bool isTimedProcessing/*=fa
+   else {
+     // OK, nobody is helping us, just tell the truth.
+     CHRONO_LOG_DBG("OK, nobody is helping us, let us try to recover");
+-    m_interestTable.erase(digest);
++    {
++      const std::lock_guard<std::mutex> lock(m_interestTable_mutex);
++      m_interestTable.erase(digest);
++    }
+     sendRecoveryInterest(digest);
+   }
+ 
+@@ -494,10 +513,17 @@ Logic::processSyncData(const Name&, ConstBufferPtr digest, const Block& syncRepl
+ {
+   CHRONO_LOG_DBG(">> Logic::processSyncData");
+   DiffStatePtr commit = make_shared<DiffState>();
+-  ConstBufferPtr previousRoot = m_state.getRootDigest();
++  ConstBufferPtr previousRoot;
++  {
++    const std::lock_guard<std::mutex> lock(m_state_mutex);
++    previousRoot = m_state.getRootDigest();
++  }
+ 
+   try {
+-    m_interestTable.erase(digest); // Remove satisfied interest from PIT
++    {
++      const std::lock_guard<std::mutex> lock(m_interestTable_mutex);
++      m_interestTable.erase(digest); // Remove satisfied interest from PIT
++    }
+ 
+     State reply;
+     reply.wireDecode(syncReply);
+@@ -512,7 +538,10 @@ Logic::processSyncData(const Name&, ConstBufferPtr digest, const Block& syncRepl
+       bool isInserted = false;
+       bool isUpdated = false;
+       SeqNo oldSeq;
+-      std::tie(isInserted, isUpdated, oldSeq) = m_state.update(info, seq);
++      {
++        const std::lock_guard<std::mutex> lock(m_state_mutex);
++        std::tie(isInserted, isUpdated, oldSeq) = m_state.update(info, seq);
++      }
+       if (isInserted || isUpdated) {
+         commit->update(info, seq);
+         oldSeq++;
+@@ -522,9 +551,11 @@ Logic::processSyncData(const Name&, ConstBufferPtr digest, const Block& syncRepl
+ 
+     if (!v.empty()) {
+       m_onUpdate(v);
+-
+-      commit->setRootDigest(m_state.getRootDigest());
+-      insertToDiffLog(commit, previousRoot);
++      {
++        const std::lock_guard<std::mutex> lock(m_state_mutex);
++        commit->setRootDigest(m_state.getRootDigest());
++        insertToDiffLog(commit, previousRoot);
++      }
+     }
+     else {
+       CHRONO_LOG_DBG("What? nothing new");
+@@ -547,6 +578,8 @@ Logic::processSyncData(const Name&, ConstBufferPtr digest, const Block& syncRepl
+ void
+ Logic::satisfyPendingSyncInterests(const Name& updatedPrefix, ConstDiffStatePtr commit)
+ {
++  const std::lock_guard<std::mutex> lock(m_interestTable_mutex);
++
+   CHRONO_LOG_DBG(">> Logic::satisfyPendingSyncInterests");
+   try {
+     CHRONO_LOG_DBG("InterestTable size: " << m_interestTable.size());
+@@ -570,6 +603,7 @@ Logic::satisfyPendingSyncInterests(const Name& updatedPrefix, ConstDiffStatePtr
+ void
+ Logic::insertToDiffLog(DiffStatePtr commit, ConstBufferPtr previousRoot)
+ {
++  const std::lock_guard<std::mutex> lock1(m_log_mutex);
+   CHRONO_LOG_DBG(">> Logic::insertToDiffLog");
+   // Connect to the history
+   if (!m_log.empty())
+@@ -612,8 +646,10 @@ void
+ Logic::sendSyncInterest()
+ {
+   CHRONO_LOG_DBG(">> Logic::sendSyncInterest");
++  const std::lock_guard<std::mutex> lock(m_state_mutex);
+ 
+   Name interestName;
++
+   interestName.append(m_syncPrefix)
+     .append(ndn::name::Component(*m_state.getRootDigest()));
+ 
+@@ -637,6 +673,7 @@ Logic::sendSyncInterest()
                                                   bind(&Logic::onSyncNack, this, _1, _2),
                                                   bind(&Logic::onSyncTimeout, this, _1));
  
@@ -26,19 +184,69 @@ index db6bc02..870b26e 100644
    CHRONO_LOG_DBG("Send interest: " << interest.getName());
    CHRONO_LOG_DBG("<< Logic::sendSyncInterest");
  }
+@@ -759,6 +796,7 @@ Logic::sendRecoveryInterest(ConstBufferPtr digest)
+   interest.setCanBePrefix(true);
+   interest.setInterestLifetime(m_recoveryInterestLifetime);
+ 
++  const std::lock_guard<std::mutex> lock(m_pendingRecoveryInterests_mutex);
+   m_pendingRecoveryInterests[interestName[-1].toUri()] = m_face.expressInterest(interest,
+     bind(&Logic::onRecoveryData, this, _1, _2),
+     bind(&Logic::onRecoveryTimeout, this, _1), // Nack
+@@ -770,6 +808,8 @@ Logic::sendRecoveryInterest(ConstBufferPtr digest)
+ void
+ Logic::processRecoveryInterest(const Interest& interest)
+ {
++  const std::lock_guard<std::mutex> lock(m_state_mutex);
++  const std::lock_guard<std::mutex> lock1(m_log_mutex);
+   CHRONO_LOG_DBG(">> Logic::processRecoveryInterest");
+ 
+   Name name = interest.getName();
+@@ -790,7 +830,10 @@ void
+ Logic::onRecoveryData(const Interest& interest, const Data& data)
+ {
+   CHRONO_LOG_DBG(">> Logic::onRecoveryData");
+-  m_pendingRecoveryInterests.erase(interest.getName()[-1].toUri());
++  {
++    const std::lock_guard<std::mutex> lock(m_pendingRecoveryInterests_mutex);
++    m_pendingRecoveryInterests.erase(interest.getName()[-1].toUri());
++  }
+   onSyncDataValidated(data);
+   CHRONO_LOG_DBG("<< Logic::onRecoveryData");
+ }
+@@ -799,6 +842,7 @@ void
+ Logic::onRecoveryTimeout(const Interest& interest)
+ {
+   CHRONO_LOG_DBG(">> Logic::onRecoveryTimeout");
++  const std::lock_guard<std::mutex> lock(m_pendingRecoveryInterests_mutex);
+   m_pendingRecoveryInterests.erase(interest.getName()[-1].toUri());
+   CHRONO_LOG_DBG("Interest: " << interest.getName());
+   CHRONO_LOG_DBG("<< Logic::onRecoveryTimeout");
 diff --git a/src/logic.hpp b/src/logic.hpp
-index 25514ed..65d76a1 100644
+index 25514ed..6fad681 100644
 --- a/src/logic.hpp
 +++ b/src/logic.hpp
-@@ -33,6 +33,11 @@
+@@ -32,6 +32,12 @@
+ #include <ndn-cxx/util/random.hpp>
  
  #include <unordered_map>
- 
++#include <mutex>
++
 +#include <boost/log/core.hpp>
 +#include <boost/log/trivial.hpp>
 +#include <boost/log/utility/setup/common_attributes.hpp>
 +#include <boost/log/utility/setup/file.hpp>
-+
+ 
  namespace chronosync {
  
- /**
+@@ -473,6 +479,11 @@ private:
+   bool m_isInReset;
+   bool m_needPeriodReset;
+ 
++  mutable std::mutex m_state_mutex;
++  mutable std::mutex m_log_mutex;
++  mutable std::mutex m_interestTable_mutex;
++  mutable std::mutex m_pendingRecoveryInterests_mutex;
++
+   // Callback
+   UpdateCallback m_onUpdate;
+ 

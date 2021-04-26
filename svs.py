@@ -39,12 +39,16 @@ from minindn.apps.app_manager import AppManager
 from minindn.apps.nfd import Nfd
 from minindn.helpers.ndn_routing_helper import NdnRoutingHelper
 
+from tqdm import tqdm
+
 RUN_NUMBER = 0
 NUM_NODES = 20
 PUB_TIMING = 0
 
+DEBUG_GDB = False
 PUB_TIMING_VALS = [1000, 5000, 10000, 15000]
 RUN_NUMBER_VALS = list(range(1, 4))
+#LOG_PREFIX = "DEFAULT"
 LOG_PREFIX = "GEANT"
 #topoFile = "topologies/default-topology.conf"
 topoFile = "topologies/geant.conf"
@@ -63,6 +67,11 @@ def getLogPath():
         os.makedirs(logpath)
         os.chown(logpath, 1000, 1000)
 
+        os.makedirs(logpath + '/stdout')
+        os.chown(logpath + '/stdout', 1000, 1000)
+        os.makedirs(logpath + '/stderr')
+        os.chown(logpath + '/stdout', 1000, 1000)
+
     return logpath
 
 class SvsChatApplication(Application):
@@ -76,7 +85,13 @@ class SvsChatApplication(Application):
         exe = SYNC_EXEC
         identity = self.get_svs_identity()
 
-        run_cmd = "{} {} {}/{}.log {} >/dev/null 2>&1 &".format(exe, identity, getLogPath(), self.node.name, PUB_TIMING)
+        if DEBUG_GDB:
+            run_cmd = "gdb -batch -ex run -ex=\"set confirm off\" -ex \"bt full\" -ex quit --args {0} {1} {2}/{3}.log {4} >{2}/stdout/{3}.log 2>{2}/stderr/{3}.log &".format(
+                exe, identity, getLogPath(), self.node.name, PUB_TIMING)
+        else:
+            run_cmd = "{0} {1} {2}/{3}.log {4} >{2}/stdout/{3}.log 2>{2}/stderr/{3}.log &".format(
+                exe, identity, getLogPath(), self.node.name, PUB_TIMING)
+
         ret = self.node.cmd(run_cmd)
         info("[{}] running {} == {}\n".format(self.node.name, run_cmd, ret))
 
@@ -89,7 +104,7 @@ def get_pids():
         try:
             pinfo = proc.as_dict(attrs=['pid', 'name', 'create_time'])
             # Check if process name contains the given name string.
-            if "eval" in pinfo['name'].lower():
+            if ("gdb" if DEBUG_GDB else "eval") in pinfo['name'].lower():
                 pids.append(pinfo['pid'])
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
@@ -108,26 +123,25 @@ if __name__ == '__main__':
     info('Starting NFD on nodes\n')
     nfds = AppManager(ndn, ndn.net.hosts, Nfd)
     info('Sleeping 10 seconds\n')
-    time.sleep(10)
+    time.sleep(3 if DEBUG_GDB else 10)
 
     info('Setting NFD strategy to multicast on all nodes with prefix')
-    for node in ndn.net.hosts:
+    for node in tqdm(ndn.net.hosts):
         Nfdc.setStrategy(node, "/ndn/svs", Nfdc.STRATEGY_MULTICAST)
-        Nfdc.setStrategy(node, "/ndn/chronosync", Nfdc.STRATEGY_MULTICAST)
 
     info('Adding static routes to NFD\n')
     start = int(time.time() * 1000)
 
     grh = NdnRoutingHelper(ndn.net, 'udp', 'link-state')
     for host in ndn.net.hosts:
-        grh.addOrigin([ndn.net[host.name]], ["/ndn/svs/", "/ndn/chronosync/"])
+        grh.addOrigin([ndn.net[host.name]], ["/ndn/svs/"])
 
     grh.calculateNPossibleRoutes()
 
     end = int(time.time() * 1000)
     info('Added static routes to NFD in {} ms\n'.format(end - start))
     info('Sleeping 10 seconds\n')
-    time.sleep(10)
+    time.sleep(3 if DEBUG_GDB else 10)
 
     for pub_timing in PUB_TIMING_VALS:
         for run_number in RUN_NUMBER_VALS:
@@ -137,7 +151,7 @@ if __name__ == '__main__':
             # Clear content store
             for node in ndn.net.hosts:
                 cmd = 'nfdc cs erase /'
-                info(node.cmd(cmd))
+                node.cmd(cmd)
 
                 with open("{}/report-start-{}.status".format(getLogPath(), node.name), "w") as f:
                     f.write(node.cmd('nfdc status report'))
