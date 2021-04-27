@@ -49,46 +49,55 @@ public:
    */
   Producer(const std::string& userPrefix)
     : m_userPrefix(userPrefix)
+    , m_scheduler(m_face.getIoService())
     , m_fullProducer(std::make_shared<psync::FullProducer>(
                       80, m_face, "/ndn/svs", userPrefix,
                       std::bind(&Producer::processSyncUpdate, this, _1),
-                      1600_ms, 1600_ms))
+                      (1600_ms * averageTimeBetweenPublishesInMilliseconds) / 5000,
+                      (1600_ms * averageTimeBetweenPublishesInMilliseconds) / 5000))
     , m_rng(ndn::random::getRandomNumberEngine())
     , m_sleepTime(averageTimeBetweenPublishesInMilliseconds - varianceInTimeBetweenPublishesInMilliseconds, averageTimeBetweenPublishesInMilliseconds + varianceInTimeBetweenPublishesInMilliseconds)
   {
     ndn::Name prefix(userPrefix);
     m_fullProducer->addUserNode(prefix);
+
+    m_scheduler.schedule(ndn::time::milliseconds(m_sleepTime(m_rng)),
+                         [this] { runIter(); });
   }
 
   void
   run()
   {
     BOOST_LOG_TRIVIAL(info) << "NODE_INIT::" << m_userPrefix;
-    std::thread thread_ps([this] { m_face.processEvents(); });
+    m_face.processEvents();
+  }
 
-    long int start_time = static_cast<long int> (time(NULL));
-
-    for (int i = 1; i < 250; i++) {
-        int sleepTimeInMilliseconds = m_sleepTime(m_rng);
-        usleep(sleepTimeInMilliseconds * 1000);
-
-        std::ostringstream ss = std::ostringstream();
-        ss << m_userPrefix << "=" << i;
-        std::string message = ss.str();
-        publishMsg(message);
-        BOOST_LOG_TRIVIAL(info) << "PUBL_MSG::" << m_userPrefix << "::" << message;
-
-        long int curr_time = static_cast<long int> (time(NULL));
-        if (curr_time - start_time > 120) {
-          break;
-        }
+  void
+  runIter()
+  {
+    if (start_time == 0) {
+      start_time = static_cast<long int> (time(NULL));
     }
 
-    sleep(30);
+    long int curr_time = static_cast<long int> (time(NULL));
+
+    if (curr_time - start_time <= 120) {
+      curr_i++;
+      std::ostringstream ss = std::ostringstream();
+      ss << m_userPrefix << "=" << curr_i;
+      std::string message = ss.str();
+      publishMsg(message);
+      BOOST_LOG_TRIVIAL(info) << "PUBL_MSG::" << m_userPrefix << "::" << message;
+    }
+
+    if (curr_time - start_time <= 120 + 30) {
+      m_scheduler.schedule(ndn::time::milliseconds(m_sleepTime(m_rng)),
+                           [this] { runIter(); });
+      return;
+    }
 
     m_fullProducer.reset();
     m_face.shutdown();
-    thread_ps.join();
   }
 
 private:
@@ -113,6 +122,10 @@ private:
 private:
   std::string m_userPrefix;
   ndn::Face m_face;
+  ndn::Scheduler m_scheduler;
+
+  long int start_time = 0;
+  int curr_i = 0;
 
   std::shared_ptr<psync::FullProducer> m_fullProducer;
 

@@ -37,45 +37,48 @@ class Program
 {
 public:
   Program(const Options &options)
-    : m_options(options),
-      m_rng(ndn::random::getRandomNumberEngine()),
-      m_sleepTime(averageTimeBetweenPublishesInMilliseconds - varianceInTimeBetweenPublishesInMilliseconds, averageTimeBetweenPublishesInMilliseconds + varianceInTimeBetweenPublishesInMilliseconds)
+    : m_options(options)
+    , m_scheduler(face.getIoService())
+    , m_rng(ndn::random::getRandomNumberEngine())
+    , m_sleepTime(averageTimeBetweenPublishesInMilliseconds - varianceInTimeBetweenPublishesInMilliseconds, averageTimeBetweenPublishesInMilliseconds + varianceInTimeBetweenPublishesInMilliseconds)
   {
-    BOOST_LOG_TRIVIAL(info) << "START_NODE::" << m_options.m_id;
+    m_scheduler.schedule(ndn::time::milliseconds(m_sleepTime(m_rng)),
+                         [this] { runIter(); });
   }
 
   void
   run()
   {
     BOOST_LOG_TRIVIAL(info) << "NODE_INIT::" << m_options.m_id;
-    std::thread thread_cs([this] { face.processEvents(); });
+    face.processEvents();
+  }
 
-    std::string init_msg = "NODE_INIT=" + m_options.m_id;
-    //publishMsg(init_msg);
-
-    long int start_time = static_cast<long int> (time(NULL));
-
-    for (int i = 1; i < 250; i++) {
-        int sleepTimeInMilliseconds = m_sleepTime(m_rng);
-        usleep(sleepTimeInMilliseconds * 1000);
-
-        std::ostringstream ss = std::ostringstream();
-        ss << m_options.m_id << "=" << i;
-        std::string message = ss.str();
-        publishMsg(message);
-        BOOST_LOG_TRIVIAL(info) << "PUBL_MSG::" << m_options.m_id << "::" << message;
-
-        long int curr_time = static_cast<long int> (time(NULL));
-        if (curr_time - start_time > 120) {
-          break;
-        }
+  void
+  runIter()
+  {
+    if (start_time == 0) {
+      start_time = static_cast<long int> (time(NULL));
     }
 
-    sleep(30);
+    long int curr_time = static_cast<long int> (time(NULL));
+
+    if (curr_time - start_time <= 120) {
+      curr_i++;
+      std::ostringstream ss = std::ostringstream();
+      ss << m_options.m_id << "=" << curr_i;
+      std::string message = ss.str();
+      publishMsg(message);
+      BOOST_LOG_TRIVIAL(info) << "PUBL_MSG::" << m_options.m_id << "::" << message;
+    }
+
+    if (curr_time - start_time <= 120 + 30) {
+      m_scheduler.schedule(ndn::time::milliseconds(m_sleepTime(m_rng)),
+                           [this] { runIter(); });
+      return;
+    }
 
     m_cs.reset();
     face.shutdown();
-    thread_cs.join();
   }
 
 protected:
@@ -110,9 +113,13 @@ public:
   const Options m_options;
   ndn::Face face;
   std::shared_ptr<chronosync::Socket> m_cs;
+  ndn::Scheduler m_scheduler;
 
   ndn::random::RandomNumberEngine& m_rng;
   std::uniform_int_distribution<> m_sleepTime;
+
+  long int start_time = 0;
+  int curr_i = 0;
 };
 
 template <typename T>
