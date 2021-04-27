@@ -44,6 +44,8 @@ from tqdm import tqdm
 RUN_NUMBER = 0
 NUM_NODES = 20
 PUB_TIMING = 0
+SYNC_EXEC = None
+LOG_MAIN_DIRECTORY = None
 
 DEBUG_GDB = False
 PUB_TIMING_VALS = [1000, 5000, 10000, 15000]
@@ -53,13 +55,17 @@ LOG_PREFIX = "GEANT_L0"
 #topoFile = "topologies/default-topology.conf"
 topoFile = "topologies/geant.conf"
 
-#SYNC_EXEC = "/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval"          # SVS
-#SYNC_EXEC = "/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval"       # Chronosync
-SYNC_EXEC = "/home/vagrant/mini-ndn/work/PSync/build/examples/psync-eval"      # PSync
+SYNC_EXEC_VALS = [
+    "/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval",          # SVS
+    "/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval",       # Chronosync
+    "/home/vagrant/mini-ndn/work/PSync/build/examples/psync-eval",      # PSync
+]
 
-#LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/svs/"                    # SVS
-#LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/chronosync/"             # ChronoSync
-LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/psync/"                  # PSync
+LOG_MAIN_DIRECTORY_VALS = [
+    "/home/vagrant/mini-ndn/work/log/svs/",                    # SVS
+    "/home/vagrant/mini-ndn/work/log/chronosync/",             # ChronoSync
+    "/home/vagrant/mini-ndn/work/log/psync/",                  # PSync
+]
 
 def getLogPath():
     LOG_NAME = "{}-{}-{}".format(LOG_PREFIX, PUB_TIMING, RUN_NUMBER)
@@ -147,40 +153,44 @@ if __name__ == '__main__':
 
     for pub_timing in PUB_TIMING_VALS:
         for run_number in RUN_NUMBER_VALS:
-            RUN_NUMBER = run_number
-            PUB_TIMING = pub_timing
+            for exec_i, sync_exec in enumerate(SYNC_EXEC_VALS):
+                # Set globals
+                RUN_NUMBER = run_number
+                PUB_TIMING = pub_timing
+                SYNC_EXEC = sync_exec
+                LOG_MAIN_DIRECTORY = LOG_MAIN_DIRECTORY_VALS[exec_i]
 
-            # Clear content store
-            for node in ndn.net.hosts:
-                cmd = 'nfdc cs erase /'
-                node.cmd(cmd)
+                # Clear content store
+                for node in ndn.net.hosts:
+                    cmd = 'nfdc cs erase /'
+                    node.cmd(cmd)
 
-                with open("{}/report-start-{}.status".format(getLogPath(), node.name), "w") as f:
-                    f.write(node.cmd('nfdc status report'))
+                    with open("{}/report-start-{}.status".format(getLogPath(), node.name), "w") as f:
+                        f.write(node.cmd('nfdc status report'))
 
-            time.sleep(1)
+                time.sleep(1)
 
-            random.seed(RUN_NUMBER)
-            allowed_hosts = [x for x in ndn.net.hosts if len(x.intfList()) < 8]
-            pub_hosts = random.sample(allowed_hosts, NUM_NODES)
+                random.seed(RUN_NUMBER)
+                allowed_hosts = [x for x in ndn.net.hosts if len(x.intfList()) < 8]
+                pub_hosts = random.sample(allowed_hosts, NUM_NODES)
 
-            # ================= SVS BEGIN ====================================
+                # ================= SVS BEGIN ====================================
 
-            # identity_app = AppManager(ndn, pub_hosts, IdentityApplication)
-            svs_chat_app = AppManager(ndn, pub_hosts, SvsChatApplication)
+                # identity_app = AppManager(ndn, pub_hosts, IdentityApplication)
+                svs_chat_app = AppManager(ndn, pub_hosts, SvsChatApplication)
 
-            # =================== SVS END ====================================
+                # =================== SVS END ====================================
 
-            pids = get_pids()
-            info("pids: {}\n".format(pids))
-            count = count_running(pids)
-            while count > 0:
-                info("{} nodes are runnning\n".format(count))
-                time.sleep(5)
+                pids = get_pids()
+                info("pids: {}\n".format(pids))
                 count = count_running(pids)
+                while count > 0:
+                    info("{} nodes are runnning\n".format(count))
+                    time.sleep(5)
+                    count = count_running(pids)
 
-            for node in ndn.net.hosts:
-                with open("{}/report-end-{}.status".format(getLogPath(), node.name), "w") as f:
-                    f.write(node.cmd('nfdc status report'))
+                for node in ndn.net.hosts:
+                    with open("{}/report-end-{}.status".format(getLogPath(), node.name), "w") as f:
+                        f.write(node.cmd('nfdc status report'))
 
     ndn.stop()
