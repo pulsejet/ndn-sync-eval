@@ -18,18 +18,10 @@ index eb44aa0..86b2b3d 100644
  namespace svs {
  
 diff --git a/ndn-svs/core.cpp b/ndn-svs/core.cpp
-index 36f1875..1ae2628 100644
+index ca476ae..3e909fd 100644
 --- a/ndn-svs/core.cpp
 +++ b/ndn-svs/core.cpp
-@@ -15,6 +15,7 @@
-  */
- 
- #include "core.hpp"
-+#include <iostream>
- 
- #include <ndn-cxx/security/signing-helpers.hpp>
- #include <ndn-cxx/security/verification-helpers.hpp>
-@@ -158,6 +159,7 @@ SVSyncCore::sendSyncInterest()
+@@ -164,6 +164,7 @@ SVSyncCore::sendSyncInterest()
    {
      std::lock_guard<std::mutex> lock(m_vvMutex);
      syncName.append(Name::Component(m_vv.encode()));
