@@ -93,12 +93,12 @@ protected:
       {
         ndn::svs::NodeID nid = v[i].session;
         BOOST_LOG_TRIVIAL(info) << "RECV_STATE::" << nid << "::" << s;
-        m_svs->fetchData(nid, s, [&] (const ndn::Data& data)
+        /* m_svs->fetchData(nid, s, [&] (const ndn::Data& data)
           {
             size_t data_size = data.getContent().value_size();
             std::string content_str((char *)data.getContent().value(), data_size);
             BOOST_LOG_TRIVIAL(info) << "RECV_MSG::" << m_options.m_id << "::" << content_str;
-          }, 5);
+          }, 5);*/
       }
     }
   }

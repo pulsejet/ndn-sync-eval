@@ -114,7 +114,7 @@ private:
     for (const auto& update : updates) {
       for (uint64_t i = update.lowSeq; i <= update.highSeq; i++) {
         BOOST_LOG_TRIVIAL(info) << "RECV_STATE::" << update.prefix << "::" << i;
-        BOOST_LOG_TRIVIAL(info) << "RECV_MSG::" << m_userPrefix << "::" << update.prefix << "=" << i;
+        // BOOST_LOG_TRIVIAL(info) << "RECV_MSG::" << m_userPrefix << "::" << update.prefix << "=" << i;
       }
     }
   }
