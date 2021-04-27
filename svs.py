@@ -49,15 +49,17 @@ DEBUG_GDB = False
 PUB_TIMING_VALS = [1000, 5000, 10000, 15000]
 RUN_NUMBER_VALS = list(range(1, 4))
 #LOG_PREFIX = "DEFAULT"
-LOG_PREFIX = "GEANT"
+LOG_PREFIX = "GEANT_L0"
 #topoFile = "topologies/default-topology.conf"
 topoFile = "topologies/geant.conf"
 
-#SYNC_EXEC = "/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval"
-SYNC_EXEC = "/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval"
+#SYNC_EXEC = "/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval"          # SVS
+#SYNC_EXEC = "/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval"       # Chronosync
+SYNC_EXEC = "/home/vagrant/mini-ndn/work/PSync/build/examples/psync-eval"      # PSync
 
-#LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/svs/"
-LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/chronosync/"
+#LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/svs/"                    # SVS
+#LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/chronosync/"             # ChronoSync
+LOG_MAIN_DIRECTORY = "/home/vagrant/mini-ndn/work/log/psync/"                  # PSync
 
 def getLogPath():
     LOG_NAME = "{}-{}-{}".format(LOG_PREFIX, PUB_TIMING, RUN_NUMBER)

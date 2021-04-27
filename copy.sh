@@ -11,3 +11,8 @@ rm -rf chronosync
 mkdir chronosync
 git -C ../../ChronoSync/ diff src > chronosync/ChronoSync.patch
 cp ../../ChronoSync/examples/* chronosync/
+
+rm -rf psync
+mkdir psync
+git -C ../../PSync/ diff PSync > psync/PSync.patch
+cp ../../PSync/examples/* psync/
