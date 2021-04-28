@@ -96,7 +96,10 @@ public:
       ss << m_userPrefix << "::" << curr_i;
       std::string message = ss.str();
       publishMsg(message);
-      BOOST_LOG_TRIVIAL(info) << "PUBL_MSG::" << m_userPrefix << "::" << message;
+
+      std::ostringstream ss1 = std::ostringstream();
+      ss1 << m_userPrefix << "=" << curr_i;
+      BOOST_LOG_TRIVIAL(info) << "PUBL_MSG::" << m_userPrefix << "::" << ss1.str();
     }
 
     if (curr_time - start_time <= 120 + 30) {
