@@ -18,3 +18,7 @@ rm -rf psync
 mkdir psync
 git -C ../../PSync/ diff PSync > psync/PSync.patch
 cp ../../PSync/examples/* psync/
+
+rm -rf syncps
+mkdir syncps
+cp ../../syncps/src/* syncps/
