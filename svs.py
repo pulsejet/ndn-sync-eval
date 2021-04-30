@@ -59,14 +59,14 @@ SYNC_EXEC_VALS = [
     #"/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval",          # SVS
     #"/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval",       # Chronosync
     "/home/vagrant/mini-ndn/work/PSync/build/examples/psync-eval",      # PSync
-    "/home/vagrant/mini-ndn/work/syncps/eval",                          # syncps
+    #"/home/vagrant/mini-ndn/work/syncps/eval",                          # syncps
 ]
 
 LOG_MAIN_DIRECTORY_VALS = [
     #"/home/vagrant/mini-ndn/work/log/svs/",                    # SVS
     #"/home/vagrant/mini-ndn/work/log/chronosync/",             # ChronoSync
     "/home/vagrant/mini-ndn/work/log/psync/",                  # PSync
-    "/home/vagrant/mini-ndn/work/log/syncps/",                 # syncps
+    #"/home/vagrant/mini-ndn/work/log/syncps/",                 # syncps
 ]
 
 def getLogPath():

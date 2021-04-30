@@ -53,8 +53,7 @@ public:
     , m_fullProducer(std::make_shared<psync::FullProducer>(
                       80, m_face, "/ndn/svs", userPrefix,
                       std::bind(&Producer::processSyncUpdate, this, _1),
-                      (1600_ms * averageTimeBetweenPublishesInMilliseconds) / 5000,
-                      (1600_ms * averageTimeBetweenPublishesInMilliseconds) / 5000))
+                      1000_ms, 1000_ms))
     , m_rng(ndn::random::getRandomNumberEngine())
     , m_sleepTime(averageTimeBetweenPublishesInMilliseconds - varianceInTimeBetweenPublishesInMilliseconds, averageTimeBetweenPublishesInMilliseconds + varianceInTimeBetweenPublishesInMilliseconds)
   {

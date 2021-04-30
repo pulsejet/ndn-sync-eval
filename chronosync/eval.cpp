@@ -20,6 +20,8 @@ int varianceInTimeBetweenPublishesInMilliseconds = 1000;
 
 #include "chat.hpp"
 
+using namespace ndn::time_literals;
+
 class ProgramPrefix : public Program
 {
 public:
@@ -29,7 +31,10 @@ public:
       ndn::Name(m_options.prefix),
       ndn::Name(m_options.m_id),
       face,
-      std::bind(&ProgramPrefix::onMissingData, this, _1));
+      std::bind(&ProgramPrefix::onMissingData, this, _1),
+      chronosync::Socket::DEFAULT_NAME,
+      chronosync::Socket::DEFAULT_VALIDATOR,
+      1000_ms);
   }
 };
 

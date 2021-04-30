@@ -34,7 +34,8 @@ public:
   Producer(const std::string& userPrefix)
     : m_userPrefix(userPrefix)
     , m_scheduler(m_face.getIoService())
-    , m_sync(std::make_shared<syncps::SyncPubsub>(m_face, "/ndn/svs", isExpired, filterPubs))
+    , m_sync(std::make_shared<syncps::SyncPubsub>(
+        m_face, "/ndn/svs", isExpired, filterPubs, 1000_ms))
     , m_rng(ndn::random::getRandomNumberEngine())
     , m_sleepTime(averageTimeBetweenPublishesInMilliseconds - varianceInTimeBetweenPublishesInMilliseconds, averageTimeBetweenPublishesInMilliseconds + varianceInTimeBetweenPublishesInMilliseconds)
   {
