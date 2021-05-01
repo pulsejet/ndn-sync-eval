@@ -18,14 +18,37 @@ index eb44aa0..86b2b3d 100644
  namespace svs {
  
 diff --git a/ndn-svs/core.cpp b/ndn-svs/core.cpp
-index ca476ae..3e909fd 100644
+index ca476ae..5bbc61e 100644
 --- a/ndn-svs/core.cpp
 +++ b/ndn-svs/core.cpp
-@@ -164,6 +164,7 @@ SVSyncCore::sendSyncInterest()
-   {
-     std::lock_guard<std::mutex> lock(m_vvMutex);
-     syncName.append(Name::Component(m_vv.encode()));
-+    BOOST_LOG_TRIVIAL(info) << "SEND_SYNC_INT::" << m_vv.toStr();
+@@ -137,8 +137,21 @@ SVSyncCore::retxSyncInterest(const bool send, unsigned int delay)
+ 
+     // Only send interest if in steady state or local vector has newer state
+     // than recorded interests
+-    if (!m_recordedVv || mergeStateVector(*m_recordedVv).first)
++    if (!m_recordedVv)
++    {
++      sendSyncInterest();
++      BOOST_LOG_TRIVIAL(info) << "SYNC_REPLY_SENT_NO_RECORD";
++    }
++    else if (mergeStateVector(*m_recordedVv).first)
++    {
+       sendSyncInterest();
++      BOOST_LOG_TRIVIAL(info) << "SYNC_REPLY_SENT_RECORD_OLD";
++    }
++    else
++    {
++      BOOST_LOG_TRIVIAL(info) << "SYNC_REPLY_SUPPRESSED";
++    }
++
+     m_recordedVv = nullptr;
    }
  
-   Interest interest(syncName, time::milliseconds(1000));
+@@ -186,6 +199,7 @@ SVSyncCore::sendSyncInterest()
+   }
+ 
+   m_face.expressInterest(interest, nullptr, nullptr, nullptr);
++  BOOST_LOG_TRIVIAL(info) << "SEND_SYNC_INT";
+ }
+ 
+ std::pair<bool, bool>

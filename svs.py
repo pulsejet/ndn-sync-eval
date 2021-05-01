@@ -41,33 +41,35 @@ from minindn.helpers.ndn_routing_helper import NdnRoutingHelper
 
 from tqdm import tqdm
 
-RUN_NUMBER = 0
+# ======================= CONFIGURATION ============================
+OVERALL_RUN = 2
+DEBUG_GDB = False
 NUM_NODES = 20
+PUB_TIMING_VALS = [1000, 5000, 10000, 15000]
+RUN_NUMBER_VALS = list(range(1, 4))
+LOG_PREFIX = "GEANT_L0"
+TOPO_FILE = "topologies/geant.conf"
+
+SYNC_EXEC_VALS = [
+    "/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval",          # SVS
+    "/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval",       # Chronosync
+    "/home/vagrant/mini-ndn/work/PSync/build/examples/psync-eval",      # PSync
+    "/home/vagrant/mini-ndn/work/syncps/eval",                          # syncps
+]
+
+LOG_MAIN_PATH = "/home/vagrant/mini-ndn/work/log/{}/".format(OVERALL_RUN)
+LOG_MAIN_DIRECTORY_VALS = [
+    LOG_MAIN_PATH + "svs/",                                       # SVS
+    LOG_MAIN_PATH + "chronosync/",                                # ChronoSync
+    LOG_MAIN_PATH + "psync/",                                     # PSync
+    LOG_MAIN_PATH + "syncps/",                                    # syncps
+]
+# ==================================================================
+
+RUN_NUMBER = 0
 PUB_TIMING = 0
 SYNC_EXEC = None
 LOG_MAIN_DIRECTORY = None
-
-DEBUG_GDB = False
-PUB_TIMING_VALS = [1000, 5000, 10000, 15000]
-RUN_NUMBER_VALS = list(range(1, 4))
-#LOG_PREFIX = "DEFAULT"
-LOG_PREFIX = "GEANT_L0"
-#topoFile = "topologies/default-topology.conf"
-topoFile = "topologies/geant.conf"
-
-SYNC_EXEC_VALS = [
-    #"/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval",          # SVS
-    #"/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval",       # Chronosync
-    "/home/vagrant/mini-ndn/work/PSync/build/examples/psync-eval",      # PSync
-    #"/home/vagrant/mini-ndn/work/syncps/eval",                          # syncps
-]
-
-LOG_MAIN_DIRECTORY_VALS = [
-    #"/home/vagrant/mini-ndn/work/log/svs/",                    # SVS
-    #"/home/vagrant/mini-ndn/work/log/chronosync/",             # ChronoSync
-    "/home/vagrant/mini-ndn/work/log/psync/",                  # PSync
-    #"/home/vagrant/mini-ndn/work/log/syncps/",                 # syncps
-]
 
 def getLogPath():
     LOG_NAME = "{}-{}-{}".format(LOG_PREFIX, PUB_TIMING, RUN_NUMBER)
@@ -126,7 +128,7 @@ if __name__ == '__main__':
     Minindn.cleanUp()
     Minindn.verifyDependencies()
 
-    ndn = Minindn(topoFile=topoFile)
+    ndn = Minindn(topoFile=TOPO_FILE)
 
     ndn.start()
 
@@ -153,9 +155,9 @@ if __name__ == '__main__':
     info('Sleeping 10 seconds\n')
     time.sleep(3 if DEBUG_GDB else 10)
 
-    for pub_timing in PUB_TIMING_VALS:
-        for run_number in RUN_NUMBER_VALS:
-            for exec_i, sync_exec in enumerate(SYNC_EXEC_VALS):
+    for exec_i, sync_exec in enumerate(SYNC_EXEC_VALS):
+        for pub_timing in PUB_TIMING_VALS:
+            for run_number in RUN_NUMBER_VALS:
                 # Set globals
                 RUN_NUMBER = run_number
                 PUB_TIMING = pub_timing
