@@ -2,8 +2,6 @@
 
 cp ~/mini-ndn/examples/svs.py .
 
-cp ../results.ipynb .
-
 rm -rf svs
 mkdir svs
 git -C ../ndn-svs/ diff ndn-svs > svs/ndn-svs.patch

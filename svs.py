@@ -48,22 +48,22 @@ DEBUG_GDB = False
 NUM_NODES = 20
 PUB_TIMING_VALS = [1000, 5000, 10000, 15000]
 RUN_NUMBER_VALS = list(range(1, 4))
-LOG_PREFIX = "GEANT_L5"
-TOPO_FILE = "topologies/geant_l5.conf"
+LOG_PREFIX = "GEANT_L0"
+TOPO_FILE = "topologies/geant_l0.conf"
 
 SYNC_EXEC_VALS = [
-    "/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval",          # SVS
-    "/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval",       # Chronosync
+    #"/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval",          # SVS
+    #"/home/vagrant/mini-ndn/work/ChronoSync/build/examples/eval",       # Chronosync
     "/home/vagrant/mini-ndn/work/PSync/build/examples/psync-eval",      # PSync
-    "/home/vagrant/mini-ndn/work/syncps/eval",                          # syncps
+    #"/home/vagrant/mini-ndn/work/syncps/eval",                          # syncps
 ]
 
 LOG_MAIN_PATH = "/home/vagrant/mini-ndn/work/log/{}/".format(OVERALL_RUN)
 LOG_MAIN_DIRECTORY_VALS = [
-    LOG_MAIN_PATH + "svs/",                                       # SVS
-    LOG_MAIN_PATH + "chronosync/",                                # ChronoSync
+    #LOG_MAIN_PATH + "svs/",                                       # SVS
+    #LOG_MAIN_PATH + "chronosync/",                                # ChronoSync
     LOG_MAIN_PATH + "psync/",                                     # PSync
-    LOG_MAIN_PATH + "syncps/",                                    # syncps
+    #LOG_MAIN_PATH + "syncps/",                                    # syncps
 ]
 # ==================================================================
 

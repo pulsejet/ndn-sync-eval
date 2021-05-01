@@ -51,7 +51,7 @@ public:
     : m_userPrefix(userPrefix)
     , m_scheduler(m_face.getIoService())
     , m_fullProducer(std::make_shared<psync::FullProducer>(
-                      80, m_face, "/ndn/svs", userPrefix,
+                      6, m_face, "/ndn/svs", userPrefix,
                       std::bind(&Producer::processSyncUpdate, this, _1),
                       1000_ms, 1000_ms))
     , m_rng(ndn::random::getRandomNumberEngine())
