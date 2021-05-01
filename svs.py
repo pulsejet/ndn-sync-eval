@@ -38,6 +38,7 @@ from minindn.util import MiniNDNCLI
 from minindn.apps.app_manager import AppManager
 from minindn.apps.nfd import Nfd
 from minindn.helpers.ndn_routing_helper import NdnRoutingHelper
+from mininet.node import OVSController
 
 from tqdm import tqdm
 
@@ -47,8 +48,8 @@ DEBUG_GDB = False
 NUM_NODES = 20
 PUB_TIMING_VALS = [1000, 5000, 10000, 15000]
 RUN_NUMBER_VALS = list(range(1, 4))
-LOG_PREFIX = "GEANT_L0"
-TOPO_FILE = "topologies/geant.conf"
+LOG_PREFIX = "GEANT_L5"
+TOPO_FILE = "topologies/geant_l5.conf"
 
 SYNC_EXEC_VALS = [
     "/home/vagrant/mini-ndn/work/ndn-svs/build/examples/eval",          # SVS
@@ -123,12 +124,14 @@ def get_pids():
     return pids
 
 if __name__ == '__main__':
+    print(LOG_PREFIX, TOPO_FILE, SYNC_EXEC_VALS)
+
     setLogLevel('info')
 
     Minindn.cleanUp()
     Minindn.verifyDependencies()
 
-    ndn = Minindn(topoFile=TOPO_FILE)
+    ndn = Minindn(topoFile=TOPO_FILE, controller = OVSController)
 
     ndn.start()
 
@@ -198,3 +201,5 @@ if __name__ == '__main__':
                         f.write(node.cmd('nfdc status report'))
 
     ndn.stop()
+
+    print(LOG_PREFIX, TOPO_FILE, SYNC_EXEC_VALS)
