@@ -28,7 +28,24 @@
 #include <string>
 #include <thread>
 
-#include "log.hpp"
+#include <boost/log/core.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/file.hpp>
+
+namespace logging = boost::log;
+namespace keywords = boost::log::keywords;
+
+void initlogger(std::string filename) {
+	logging::add_common_attributes();
+	logging::add_file_log
+	(
+		keywords::file_name = filename,
+		keywords::format = "\"%TimeStamp%\", \"%ProcessID%\", \"%ThreadID%\", \"%Message%\"",
+		keywords::open_mode = std::ios_base::app,
+		keywords::auto_flush = true
+	);
+}
 
 int averageTimeBetweenPublishesInMilliseconds = 5000;
 int varianceInTimeBetweenPublishesInMilliseconds = 1000;
@@ -136,7 +153,7 @@ int
 main(int argc, char* argv[])
 {
   if (argc != 4) {
-    BOOST_LOG_TRIVIAL(error) << "WRONG_ARGS";
+    BOOST_LOG_TRIVIAL(error) << "USAGE: ./eval prefix logfile publish_time";
     exit(1);
   }
 
